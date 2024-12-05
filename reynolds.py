@@ -55,46 +55,64 @@ class ReynoldsRules:
         self.map_data = np.array(msg.data).reshape((msg.info.height, msg.info.width))
         
     def get_nearest_obstacle_in_front(self, range_ahead=5.0, num_rays=3):
+        # check if map is loaded, default detection range 5 m, default number of rays is 3
         if self.map_data is None:
             return None
         
+        # convert the boids's position from world coordinates to map grid coordinates
         map_x = int((self.position[0] - self.map_origin[0]) / self.map_resolution)
         map_y = int((self.position[1] - self.map_origin[1]) / self.map_resolution)
         
+        # calculate angle of the boids's velocity vector and generate angles for detection rays
         velocity_angle = np.arctan2(self.velocity[1], self.velocity[0])
         angles = np.linspace(velocity_angle - np.pi / 6, velocity_angle + np.pi / 6, num_rays)  # -30 0 +30
         
-        obstacle_distances = []
+        obstacle_distances = [] # empty list to store the distances to obstacles along each ray
         for angle in angles:
-            nearest_obstacle_distance = float('inf')  
+            nearest_obstacle_distance = float('inf')  # initialize the distance as infinity (can't see obstacle)
+
+            # trace a ray outward from the boid's position along the current angle
             for i in range(1, int(range_ahead / self.map_resolution)):  
                 x_offset = i * math.cos(angle) * self.map_resolution
                 y_offset = i * math.sin(angle) * self.map_resolution
+
+                # calculate the grid cell being checked
                 ray_x = int(map_x + x_offset / self.map_resolution)
                 ray_y = int(map_y + y_offset / self.map_resolution)
+
+                # check if cell is within map bounds
                 if 0 <= ray_x < self.map_data.shape[1] and 0 <= ray_y < self.map_data.shape[0]:
-                    if self.map_data[ray_y, ray_x] == 100:  
+                     # if the cell is occupied (value 100), update nearest obstacle distance
+                    if self.map_data[ray_y, ray_x] == 100:   
                         nearest_obstacle_distance = min(nearest_obstacle_distance, i * self.map_resolution)
-                        break  
-		    
+                        break  # break after detection
+            # if detected, append the distance, if not, set it to infy
             if nearest_obstacle_distance != float('inf'):
                 obstacle_distances.append(nearest_obstacle_distance)
             else:
                 obstacle_distances.append(float('inf'))
-
         return obstacle_distances
         
         
     def object_dodge_vel(self, neighborhood_distance = 2.0, neighborhood_angle = 180):
         obstacle_distances = self.get_nearest_obstacle_in_front()
         
-        dodge_force = np.array([0.0, 0.0])
+        dodge_force = np.array([0.0, 0.0]) # initialize the dodge force vector as zero [x y]
+
+        # check if the middle ray detects an obstacle within the neighborhood distance
         if obstacle_distances[1] < neighborhood_distance:
+            # then compare this with other rays to see which side is closest to the obstacle
             if obstacle_distances[0] > obstacle_distances[2]:
-                dodge_force += np.matmul(np.array([[0, 1], [-1, 0]]), self.velocity)
+                # if the left is clearer, steer right
+                dodge_force += np.matmul(np.array([[0, 1], [-1, 0]]), self.velocity) # rotate velocity clockwise
             else: 
-                dodge_force += np.matmul(np.array([[0, -1], [1, 0]]), self.velocity)
+                # if the right is clearer, steer left
+                dodge_force += np.matmul(np.array([[0, -1], [1, 0]]), self.velocity) # rotate counter-clockwise
+
+            # subtract the current velocity to focus only on the dodge adjustment
             dodge_force -= self.velocity
+
+            # scaling this velocity inversly with the cube of the distance (the closer the boid is, the stronger the force)
             dodge_force = dodge_force / obstacle_distances[0]**3
         
             
