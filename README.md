@@ -49,6 +49,6 @@ To improve swarm coordination, **consensus-based control** was introduced:
 - Swarm behaviors **successfully adapted from 2D to 3D**.
 - Consensus-based control **improved coordination efficiency**.
 - Formation strategies demonstrated **scalability and adaptability**.
-- Videos showcasing results: [!Straight line formation](demo.gif).
+- Videos showcasing results: [!Straight line from triangle formation](demo.gif).
 
 ---
